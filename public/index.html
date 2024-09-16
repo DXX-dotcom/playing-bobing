@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多人掷骰子游戏</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .dice {
+            display: inline-block;
+            width: 80px;
+            height: 80px;
+            margin: 5px;
+        }
+        .player {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>多人掷骰子游戏</h1>
+    
+    <label for="players">玩家人数:</label>
+    <input type="number" id="players" min="1" max="6" value="1">
+    <button onclick="setupGame()">设置游戏</button>
+
+    <div id="gameArea"></div>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:3000');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'roll') {
+                rollDiceForPlayer(data.player, data.results);
+            }
+        };
+
+        function setupGame() {
+            const playerCount = document.getElementById('players').value;
+            const gameArea = document.getElementById('gameArea');
+            gameArea.innerHTML = ''; // 清空之前的游戏区域
+
+            for (let i = 1; i <= playerCount; i++) {
+                // 创建每个玩家的骰子显示区域
+                let playerDiv = document.createElement('div');
+                playerDiv.className = 'player';
+                playerDiv.id = `player${i}`;
+                
+                let playerTitle = document.createElement('h2');
+                playerTitle.textContent = `玩家 ${i}`;
+                playerDiv.appendChild(playerTitle);
+
+                // 每个玩家有六个骰子
+                for (let j = 1; j <= 6; j++) {
+                    let diceImg = document.createElement('img');
+                    diceImg.className = 'dice';
+                    diceImg.id = `player${i}_dice${j}`;
+                    diceImg.src = 'dice1.png'; // 默认骰子显示
+                    playerDiv.appendChild(diceImg);
+                }
+
+                // 每个玩家一个掷骰子按钮
+                let rollButton = document.createElement('button');
+                rollButton.textContent = `玩家 ${i} 掷骰子`;
+                rollButton.onclick = function() {
+                    socket.send(JSON.stringify({ type: 'roll', player: i }));
+                };
+                playerDiv.appendChild(rollButton);
+
+                // 将玩家的区域添加到游戏区域中
+                gameArea.appendChild(playerDiv);
+            }
+        }
+
+        function rollDiceForPlayer(playerNumber, results) {
+            for (let i = 0; i < 6; i++) {
+                let result = results[i];
+                document.getElementById(`player${playerNumber}_dice${i + 1}`).src = `dice${result}.png`;
+            }
+        }
+    </script>
+</body>
+</html>
