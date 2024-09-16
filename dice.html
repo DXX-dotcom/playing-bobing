@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博！饼！</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .dice {
+            display: inline-block;
+            width: 100px;
+            height: 100px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>博！饼！</h1>
+    <button onclick="rollDice()">掷骰子</button>
+    <div id="results">
+        <img class="dice" id="dice1" src="pic/dice1.png" alt="骰子1">
+        <img class="dice" id="dice2" src="pic/dice2.png" alt="骰子2">
+        <img class="dice" id="dice3" src="pic/dice3.png" alt="骰子3">
+        <img class="dice" id="dice4" src="pic/dice4.png" alt="骰子4">
+        <img class="dice" id="dice5" src="pic/dice5.png" alt="骰子5">
+        <img class="dice" id="dice6" src="pic/dice6.png" alt="骰子6">
+    </div>
+    <img  src="pic/WechatIMG23.jpg" alt="结算表" width=400>
+    <script>
+        function rollDice() {
+            for (let i = 1; i <= 6; i++) {
+                let result = Math.floor(Math.random() * 6) + 1;
+                document.getElementById('dice' + i).src = `pic/dice${result}.png`;
+            }
+        }
+    </script>
+</body>
+</html>
