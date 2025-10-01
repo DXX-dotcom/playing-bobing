@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -8,43 +7,55 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// 静态文件托管（public 文件夹里放 index.html 和骰子图片）
 app.use(express.static(path.join(__dirname, 'public')));
 
+let playerCount = 0;
+let players = {}; // 保存玩家信息 {id: ws}
+
 wss.on('connection', (ws) => {
-  console.log('✅ 有玩家连接进来');
+  playerCount++;
+  const playerId = playerCount;
+  players[playerId] = ws;
+
+  console.log(`✅ 玩家 ${playerId} 加入`);
+
+  // 通知自己分配到的 id
+  ws.send(JSON.stringify({ type: 'welcome', player: playerId }));
+
+  // 通知所有人有新玩家
+  broadcast({ type: 'playerJoined', player: playerId });
 
   ws.on('message', (message) => {
     const data = JSON.parse(message);
 
     if (data.type === 'roll') {
-      // 掷 6 个骰子
       let results = [];
       for (let i = 0; i < 6; i++) {
         results.push(Math.floor(Math.random() * 6) + 1);
       }
-
-      // 广播结果给所有客户端
-      const response = {
+      broadcast({
         type: 'roll',
         player: data.player,
         results: results
-      };
-
-      wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(response));
-        }
       });
     }
   });
 
   ws.on('close', () => {
-    console.log('❌ 玩家断开连接');
+    console.log(`❌ 玩家 ${playerId} 离开`);
+    delete players[playerId];
+    broadcast({ type: 'playerLeft', player: playerId });
   });
 });
 
-// Render 必须用 process.env.PORT
+function broadcast(msg) {
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(msg));
+    }
+  });
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 服务器已启动在端口 ${PORT}`);
