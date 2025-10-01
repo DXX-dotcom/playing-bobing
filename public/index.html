@@ -8,10 +8,19 @@
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
     .dice { width: 60px; height: 60px; margin: 3px; }
     .player { margin-bottom: 15px; }
+    #gameArea { max-height: 400px; overflow-y: auto; margin-top: 20px; }
+    input { padding: 5px; font-size: 14px; }
+    button { padding: 5px 10px; font-size: 14px; }
   </style>
 </head>
 <body>
   <h1>🎲 多人掷骰子游戏</h1>
+
+  <div>
+    昵称：<input type="text" id="nameInput" placeholder="输入昵称">
+    <button id="joinBtn">加入游戏</button>
+  </div>
+
   <div id="gameArea"></div>
 
   <script>
@@ -20,7 +29,17 @@
     );
 
     let myPlayerId = null;
+    let myPlayerName = null;
     const gameArea = document.getElementById('gameArea');
+    const nameInput = document.getElementById('nameInput');
+    const joinBtn = document.getElementById('joinBtn');
+
+    joinBtn.onclick = () => {
+      const name = nameInput.value.trim() || null;
+      socket.send(JSON.stringify({ type: 'setName', name: name }));
+      nameInput.disabled = true;
+      joinBtn.disabled = true;
+    };
 
     socket.onopen = () => {
       console.log("✅ 已连接服务器");
@@ -32,13 +51,16 @@
       if (data.type === 'welcome') {
         myPlayerId = data.player;
         console.log("我是玩家", myPlayerId);
-        createPlayerUI(myPlayerId);
+      }
+
+      if (data.type === 'existingPlayers') {
+        data.players.forEach(p => createPlayerUI(p.id, p.name));
+        scrollGameAreaToBottom();
       }
 
       if (data.type === 'playerJoined') {
-        if (data.player !== myPlayerId) {
-          createPlayerUI(data.player);
-        }
+        createPlayerUI(data.player.id, data.player.name);
+        scrollGameAreaToBottom();
       }
 
       if (data.type === 'playerLeft') {
@@ -48,9 +70,15 @@
       if (data.type === 'roll') {
         rollDiceForPlayer(data.player, data.results);
       }
+
+      if (data.type === 'nameConfirmed') {
+        myPlayerName = data.name;
+        createPlayerUI(myPlayerId, myPlayerName);
+        scrollGameAreaToBottom();
+      }
     };
 
-    function createPlayerUI(playerId) {
+    function createPlayerUI(playerId, name) {
       if (document.getElementById(`player${playerId}`)) return;
 
       let playerDiv = document.createElement('div');
@@ -58,7 +86,7 @@
       playerDiv.id = `player${playerId}`;
 
       let playerTitle = document.createElement('h2');
-      playerTitle.textContent = `玩家 ${playerId}`;
+      playerTitle.textContent = name ? name : `玩家 ${playerId}`;
       playerDiv.appendChild(playerTitle);
 
       for (let j = 1; j <= 6; j++) {
@@ -69,8 +97,9 @@
         playerDiv.appendChild(diceImg);
       }
 
-      if (playerId === myPlayerId) {
+      if (playerId === myPlayerId && !document.getElementById(`player${playerId}_rollBtn`)) {
         let rollButton = document.createElement('button');
+        rollButton.id = `player${playerId}_rollBtn`;
         rollButton.textContent = "掷骰子";
         rollButton.onclick = function() {
           socket.send(JSON.stringify({ type: 'roll', player: myPlayerId }));
@@ -90,6 +119,10 @@
       for (let i = 0; i < 6; i++) {
         document.getElementById(`player${playerNumber}_dice${i + 1}`).src = `dice${results[i]}.png`;
       }
+    }
+
+    function scrollGameAreaToBottom() {
+      gameArea.scrollTop = gameArea.scrollHeight;
     }
   </script>
 </body>
