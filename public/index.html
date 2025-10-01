@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>多人掷骰子游戏</title>
+  <title>🎲幸运大博饼🎲</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
     .dice { width: 60px; height: 60px; margin: 3px; }
     .player { margin-bottom: 15px; }
     #gameArea { max-height: 400px; overflow-y: auto; margin-top: 20px; }
-    input { padding: 5px; font-size: 14px; }
-    button { padding: 5px 10px; font-size: 14px; }
+    input, button { padding: 5px 10px; font-size: 14px; margin: 5px; }
   </style>
 </head>
 <body>
-  <h1>🎲 多人掷骰子游戏</h1>
+  <h1>🎲幸运大博饼🎲</h1>
 
   <div>
     昵称：<input type="text" id="nameInput" placeholder="输入昵称">
     <button id="joinBtn">加入游戏</button>
+    <button id="newGameBtn">开启新游戏</button>
+    <button id="endGameBtn">结束游戏</button>
   </div>
 
   <div id="gameArea"></div>
@@ -30,15 +31,34 @@
 
     let myPlayerId = null;
     let myPlayerName = null;
+    let gameEnded = false;
+
     const gameArea = document.getElementById('gameArea');
     const nameInput = document.getElementById('nameInput');
     const joinBtn = document.getElementById('joinBtn');
+    const newGameBtn = document.getElementById('newGameBtn');
+    const endGameBtn = document.getElementById('endGameBtn');
 
     joinBtn.onclick = () => {
       const name = nameInput.value.trim() || null;
+      myPlayerName = name || null;
+
+      if (!document.getElementById(`player${myPlayerId}`)) {
+        createPlayerUI(myPlayerId, myPlayerName);
+        scrollGameAreaToBottom();
+      }
+
       socket.send(JSON.stringify({ type: 'setName', name: name }));
       nameInput.disabled = true;
       joinBtn.disabled = true;
+    };
+
+    newGameBtn.onclick = () => {
+      socket.send(JSON.stringify({ type: 'newGame' }));
+    };
+
+    endGameBtn.onclick = () => {
+      socket.send(JSON.stringify({ type: 'endGame' }));
     };
 
     socket.onopen = () => {
@@ -73,8 +93,20 @@
 
       if (data.type === 'nameConfirmed') {
         myPlayerName = data.name;
-        createPlayerUI(myPlayerId, myPlayerName);
-        scrollGameAreaToBottom();
+        const playerDiv = document.getElementById(`player${myPlayerId}`);
+        if (playerDiv) {
+          playerDiv.querySelector('h2').textContent = myPlayerName;
+        }
+      }
+
+      if (data.type === 'gameReset') {
+        gameArea.innerHTML = '';
+        alert("🔄 新游戏已开启！");
+      }
+
+      if (data.type === 'gameEnded') {
+        gameEnded = true;
+        alert("⛔ 游戏已结束！");
       }
     };
 
@@ -102,7 +134,11 @@
         rollButton.id = `player${playerId}_rollBtn`;
         rollButton.textContent = "掷骰子";
         rollButton.onclick = function() {
-          socket.send(JSON.stringify({ type: 'roll', player: myPlayerId }));
+          if (!gameEnded) {
+            socket.send(JSON.stringify({ type: 'roll', player: myPlayerId }));
+          } else {
+            alert("游戏已结束，请重新开始！");
+          }
         };
         playerDiv.appendChild(rollButton);
       }
