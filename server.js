@@ -9,31 +9,41 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-let playerCount = 0;
-let players = {}; // { id: { ws, name } }
+// 玩家管理
+let players = {};       // { id: { ws, name } }
+let freeIds = [];       // 空闲 ID 队列
+let nextId = 1;         // 下一个可用 ID
 
 wss.on('connection', (ws) => {
-  playerCount++;
-  const playerId = playerCount;
-  players[playerId] = { ws, name: null };
+  // 分配玩家 ID
+  let playerId;
+  if (freeIds.length > 0) {
+    playerId = freeIds.shift();
+  } else {
+    playerId = nextId++;
+  }
 
+  players[playerId] = { ws, name: null };
   console.log(`✅ 玩家 ${playerId} 加入`);
 
-  // 通知自己分配到的 id
+  // 发送欢迎信息
   ws.send(JSON.stringify({ type: 'welcome', player: playerId }));
 
-  // 发送当前已存在的玩家列表给新玩家
+  // 发送已有玩家列表
   const existingPlayers = Object.keys(players)
     .filter(id => id != playerId)
     .map(id => ({ id: Number(id), name: players[id].name }));
   ws.send(JSON.stringify({ type: 'existingPlayers', players: existingPlayers }));
 
+  // 消息处理
   ws.on('message', (message) => {
     const data = JSON.parse(message);
 
     if (data.type === 'setName') {
       players[playerId].name = data.name || `玩家 ${playerId}`;
+      // 确认昵称
       ws.send(JSON.stringify({ type: 'nameConfirmed', name: players[playerId].name }));
+      // 广播新玩家
       broadcast({ type: 'playerJoined', player: { id: playerId, name: players[playerId].name } });
     }
 
@@ -42,21 +52,20 @@ wss.on('connection', (ws) => {
       for (let i = 0; i < 6; i++) {
         results.push(Math.floor(Math.random() * 6) + 1);
       }
-      broadcast({
-        type: 'roll',
-        player: data.player,
-        results: results
-      });
+      broadcast({ type: 'roll', player: data.player, results: results });
     }
   });
 
+  // 玩家离开
   ws.on('close', () => {
     console.log(`❌ 玩家 ${playerId} 离开`);
     delete players[playerId];
+    freeIds.push(playerId); // 回收 ID
     broadcast({ type: 'playerLeft', player: playerId });
   });
 });
 
+// 广播函数
 function broadcast(msg) {
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
