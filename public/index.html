@@ -31,7 +31,8 @@
     <div id="gameArea"></div>
 
     <script>
-        const socket = new WebSocket('ws://localhost:3000');
+        const socket = new WebSocket(`wss://${window.location.host}`);
+
 
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
