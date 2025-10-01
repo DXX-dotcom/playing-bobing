@@ -1,94 +1,96 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多人掷骰子游戏</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        .dice {
-            display: inline-block;
-            width: 80px;
-            height: 80px;
-            margin: 5px;
-        }
-        .player {
-            margin-bottom: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多人掷骰子游戏</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+    .dice { width: 60px; height: 60px; margin: 3px; }
+    .player { margin-bottom: 15px; }
+  </style>
 </head>
 <body>
-    <h1>🎲 多人掷骰子游戏</h1>
-    
-    <label for="players">玩家人数:</label>
-    <input type="number" id="players" min="1" max="6" value="1">
-    <button onclick="setupGame()">设置游戏</button>
+  <h1>🎲 多人掷骰子游戏</h1>
+  <div id="gameArea"></div>
 
-    <div id="gameArea"></div>
+  <script>
+    const socket = new WebSocket(
+      (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host
+    );
 
-    <script>
-        // ✅ 改成自动适配当前域名（Render 部署后也能用）
-        const socket = new WebSocket(
-            (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host
-        );
+    let myPlayerId = null;
+    const gameArea = document.getElementById('gameArea');
 
-        socket.onopen = () => {
-            console.log("✅ 已连接到服务器");
-        };
+    socket.onopen = () => {
+      console.log("✅ 已连接服务器");
+    };
 
-        socket.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'roll') {
-                rollDiceForPlayer(data.player, data.results);
-            }
-        };
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-        function setupGame() {
-            const playerCount = document.getElementById('players').value;
-            const gameArea = document.getElementById('gameArea');
-            gameArea.innerHTML = ''; // 清空之前的游戏区域
+      if (data.type === 'welcome') {
+        myPlayerId = data.player;
+        console.log("我是玩家", myPlayerId);
+        createPlayerUI(myPlayerId);
+      }
 
-            for (let i = 1; i <= playerCount; i++) {
-                // 创建每个玩家的区域
-                let playerDiv = document.createElement('div');
-                playerDiv.className = 'player';
-                playerDiv.id = `player${i}`;
-                
-                let playerTitle = document.createElement('h2');
-                playerTitle.textContent = `玩家 ${i}`;
-                playerDiv.appendChild(playerTitle);
-
-                // 6 个骰子
-                for (let j = 1; j <= 6; j++) {
-                    let diceImg = document.createElement('img');
-                    diceImg.className = 'dice';
-                    diceImg.id = `player${i}_dice${j}`;
-                    diceImg.src = 'dice1.png'; // 默认骰子
-                    playerDiv.appendChild(diceImg);
-                }
-
-                // 掷骰子按钮
-                let rollButton = document.createElement('button');
-                rollButton.textContent = `玩家 ${i} 掷骰子`;
-                rollButton.onclick = function() {
-                    socket.send(JSON.stringify({ type: 'roll', player: i }));
-                };
-                playerDiv.appendChild(rollButton);
-
-                gameArea.appendChild(playerDiv);
-            }
+      if (data.type === 'playerJoined') {
+        if (data.player !== myPlayerId) {
+          createPlayerUI(data.player);
         }
+      }
 
-        function rollDiceForPlayer(playerNumber, results) {
-            for (let i = 0; i < 6; i++) {
-                let result = results[i];
-                document.getElementById(`player${playerNumber}_dice${i + 1}`).src = `dice${result}.png`;
-            }
-        }
-    </script>
+      if (data.type === 'playerLeft') {
+        removePlayerUI(data.player);
+      }
+
+      if (data.type === 'roll') {
+        rollDiceForPlayer(data.player, data.results);
+      }
+    };
+
+    function createPlayerUI(playerId) {
+      if (document.getElementById(`player${playerId}`)) return;
+
+      let playerDiv = document.createElement('div');
+      playerDiv.className = 'player';
+      playerDiv.id = `player${playerId}`;
+
+      let playerTitle = document.createElement('h2');
+      playerTitle.textContent = `玩家 ${playerId}`;
+      playerDiv.appendChild(playerTitle);
+
+      for (let j = 1; j <= 6; j++) {
+        let diceImg = document.createElement('img');
+        diceImg.className = 'dice';
+        diceImg.id = `player${playerId}_dice${j}`;
+        diceImg.src = 'dice1.png';
+        playerDiv.appendChild(diceImg);
+      }
+
+      if (playerId === myPlayerId) {
+        let rollButton = document.createElement('button');
+        rollButton.textContent = "掷骰子";
+        rollButton.onclick = function() {
+          socket.send(JSON.stringify({ type: 'roll', player: myPlayerId }));
+        };
+        playerDiv.appendChild(rollButton);
+      }
+
+      gameArea.appendChild(playerDiv);
+    }
+
+    function removePlayerUI(playerId) {
+      let el = document.getElementById(`player${playerId}`);
+      if (el) el.remove();
+    }
+
+    function rollDiceForPlayer(playerNumber, results) {
+      for (let i = 0; i < 6; i++) {
+        document.getElementById(`player${playerNumber}_dice${i + 1}`).src = `dice${results[i]}.png`;
+      }
+    }
+  </script>
 </body>
 </html>
