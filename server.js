@@ -11,6 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let playerCount = 0;
 let players = {}; // { id: { ws, name } }
+let gameEnded = false;
 
 wss.on('connection', (ws) => {
   playerCount++;
@@ -19,10 +20,8 @@ wss.on('connection', (ws) => {
 
   console.log(`✅ 玩家 ${playerId} 加入`);
 
-  // 通知自己分配到的 id
   ws.send(JSON.stringify({ type: 'welcome', player: playerId }));
 
-  // 发送当前已存在的玩家列表给新玩家
   const existingPlayers = Object.keys(players)
     .filter(id => id != playerId)
     .map(id => ({ id: Number(id), name: players[id].name }));
@@ -37,16 +36,24 @@ wss.on('connection', (ws) => {
       broadcast({ type: 'playerJoined', player: { id: playerId, name: players[playerId].name } });
     }
 
-    if (data.type === 'roll') {
+    if (data.type === 'roll' && !gameEnded) {
       let results = [];
       for (let i = 0; i < 6; i++) {
         results.push(Math.floor(Math.random() * 6) + 1);
       }
-      broadcast({
-        type: 'roll',
-        player: data.player,
-        results: results
-      });
+      broadcast({ type: 'roll', player: data.player, results: results });
+    }
+
+    if (data.type === 'newGame') {
+      players = {};
+      playerCount = 0;
+      gameEnded = false;
+      broadcast({ type: 'gameReset' });
+    }
+
+    if (data.type === 'endGame') {
+      gameEnded = true;
+      broadcast({ type: 'gameEnded' });
     }
   });
 
