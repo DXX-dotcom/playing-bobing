@@ -1,3 +1,17 @@
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+let playerCount = 0;
+let players = {}; // { id: { ws, name } }
+
 wss.on('connection', (ws) => {
   playerCount++;
   const playerId = playerCount;
@@ -14,7 +28,6 @@ wss.on('connection', (ws) => {
     .map(id => ({ id: Number(id), name: players[id].name }));
   ws.send(JSON.stringify({ type: 'existingPlayers', players: existingPlayers }));
 
-  // 处理消息
   ws.on('message', (message) => {
     const data = JSON.parse(message);
 
@@ -42,4 +55,17 @@ wss.on('connection', (ws) => {
     delete players[playerId];
     broadcast({ type: 'playerLeft', player: playerId });
   });
+});
+
+function broadcast(msg) {
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(msg));
+    }
+  });
+}
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 服务器已启动在端口 ${PORT}`);
 });
